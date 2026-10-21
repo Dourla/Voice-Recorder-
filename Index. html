@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Recorder Studio — clean, master, normalise</title>
+<style>
+:root{
+  --bg:#0a0e13; --bg2:#0e141b; --panel:#141c26; --panel2:#1a2530; --line:#26323f;
+  --txt:#e8eff7; --muted:#93a5ba; --dim:#63748a;
+  --accent:#4f8cff; --accent2:#22d3a5; --danger:#ff5c72; --warn:#ffb454; --rec:#ff3b5c;
+  --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:radial-gradient(1200px 700px at 15% -10%, #16202c 0%, var(--bg) 55%) fixed;
+  color:var(--txt);
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  padding:28px 18px 64px;
+}
+.wrap{max-width:1060px;margin:0 auto}
+header.top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.logo{
+  width:42px;height:42px;border-radius:12px;flex:0 0 auto;
+  background:linear-gradient(140deg,var(--accent),var(--accent2));
+  display:grid;place-items:center;box-shadow:0 6px 18px rgba(79,140,255,.35)
+}
+.logo svg{width:24px;height:24px}
+h1{font-size:20px;margin:0;letter-spacing:.2px}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.badge{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin-left:auto}
+.card{
+  background:linear-gradient(180deg,var(--panel),var(--bg2));
+  border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:20px;margin-top:18px
+}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);margin:0 0 16px;font-weight:600}
+
+/* ---------- recorder ---------- */
+.rec-grid{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:center}
+@media (max-width:640px){.rec-grid{grid-template-columns:1fr;justify-items:center;text-align:center}}
+.rec-btn{
+  width:112px;height:112px;border-radius:50%;border:none;cursor:pointer;position:relative;
+  background:linear-gradient(150deg,#2a3a52,#1b2635);color:var(--txt);
+  display:grid;place-items:center;transition:transform .12s ease,box-shadow .2s ease;
+  box-shadow:0 8px 24px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.05)
+}
+.rec-btn:hover{transform:translateY(-1px)}
+.rec-btn:active{transform:scale(.97)}
+.rec-btn .dot{width:34px;height:34px;border-radius:50%;background:var(--rec);transition:all .18s ease}
+.rec-btn.recording{background:linear-gradient(150deg,#3a1c26,#26141b);box-shadow:0 0 0 6px rgba(255,59,92,.12),0 8px 24px rgba(0,0,0,.4)}
+.rec-btn.recording .dot{width:26px;height:26px;border-radius:6px}
+.rec-btn.recording::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(255,59,92,.5);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{transform:scale(.96);opacity:.9}70%{transform:scale(1.16);opacity:0}100%{opacity:0}}
+.rec-info{width:100%}
+.timer{font-variant-numeric:tabular-nums;font-size:34px;font-weight:600;letter-spacing:1px;margin:0 0 10px}
+.status{color:var(--muted);font-size:13px;min-height:18px;margin-top:8px}
+.meter{height:10px;border-radius:6px;background:#0c1219;border:1px solid var(--line);overflow:hidden;position:relative}
+.meter > i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent) 65%,var(--warn) 88%,var(--danger));transition:width .06s linear}
+.field{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+label.inline{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px}
+select,input[type=number]{
+  background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;
+  padding:8px 10px;font-size:13px;outline:none
+}
+select:focus,input:focus{border-color:var(--accent)}
+
+/* ---------- options ---------- */
+.opt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px 22px}
+.opt{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.opt .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.opt .name{font-size:14px;font-weight:600}
+.opt .hint{font-size:11.5px;color:var(--dim);margin-top:3px}
+.switch{position:relative;width:42px;height:24px;flex:0 0 auto}
+.switch input{opacity:0;width:0;height:0}
+.slider-track{position:absolute;inset:0;border-radius:999px;background:#0c1219;border:1px solid var(--line);transition:.18s;cursor:pointer}
+.slider-track::before{content:"";position:absolute;width:18px;height:18px;left:2px;top:2px;border-radius:50%;background:#6b7c92;transition:.18s}
+.switch input:checked + .slider-track{background:rgba(79,140,255,.25);border-color:var(--accent)}
+.switch input:checked + .slider-track::before{transform:translateX(18px);background:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent);margin-top:8px}
+.val{font-variant-numeric:tabular-nums;color:var(--accent2);font-size:12px;font-weight:600}
+
+/* ---------- recordings ---------- */
+.empty{color:var(--dim);font-size:13.5px;text-align:center;padding:22px;border:1px dashed var(--line);border-radius:12px}
+.rec-item{border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:12px;background:var(--panel2)}
+.rec-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rec-head .title{font-weight:600;font-size:14.5px}
+.rec-head .meta{color:var(--dim);font-size:12px}
+.spacer{flex:1}
+audio{width:100%;margin-top:12px;height:38px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button.btn{
+  background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:9px;
+  padding:8px 14px;font-size:13px;cursor:pointer;transition:.15s;font-weight:500
+}
+button.btn:hover{border-color:var(--accent);background:#182535}
+button.btn.primary{background:linear-gradient(150deg,var(--accent),#3a6fe0);border-color:transparent;color:#fff}
+button.btn.primary:hover{filter:brightness(1.08)}
+button.btn.ghost{background:transparent;color:var(--muted)}
+button.btn.danger:hover{border-color:var(--danger);color:var(--danger);background:rgba(255,92,114,.08)}
+button.btn:disabled{opacity:.45;cursor:not-allowed}
+.progress{height:8px;border-radius:6px;background:#0c1219;border:1px solid var(--line);overflow:hidden;margin-top:12px;display:none}
+.progress > i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .2s ease}
+.prog-label{font-size:12px;color:var(--muted);margin-top:6px;display:none}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
+.stat{background:#0f1620;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.7px}
+.stat .v{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.stat .v.good{color:var(--accent2)}
+.pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;background:rgba(79,140,255,.14);color:#9dc0ff;border:1px solid rgba(79,140,255,.3);margin:2px 4px 0 0}
+.pill.done{background:rgba(34,211,165,.12);color:#7fe7c9;border-color:rgba(34,211,165,.3)}
+.err{color:var(--danger);font-size:13px;margin-top:10px}
+.banner{
+  background:linear-gradient(180deg,rgba(255,180,84,.14),rgba(255,180,84,.06));
+  border:1px solid rgba(255,180,84,.4);border-radius:12px;padding:13px 16px;margin-top:18px;
+  font-size:13.5px;line-height:1.6;color:#ffd9a3
+}
+.banner code{background:rgba(0,0,0,.35);border:1px solid rgba(255,180,84,.3);border-radius:6px;padding:1px 6px;color:#ffe6c2}
+.banner strong{color:#ffcf88}
+footer{margin-top:26px;color:var(--dim);font-size:12px;line-height:1.8}
+footer code{background:#0f1620;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#a9bdd6}
+.note{font-size:12px;color:var(--dim);margin-top:10px}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="banner" id="secureBanner" hidden></div>
+
+  <header class="top">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+        <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+        <path d="M5 11a7 7 0 0 0 14 0"></path>
+        <line x1="12" y1="18" x2="12" y2="21"></line>
+      </svg>
+    </div>
+    <div>
+      <h1>Voice Recorder Studio</h1>
+      <p class="sub">Record in the browser, then remove noise, sharpen voice, master and normalise to a broadcast loudness standard.</p>
+    </div>
+    <span class="badge">100% on-device</span>
+  </header>
+
+  <!-- ===================== RECORDER ===================== -->
+  <section class="card">
+    <h2>Record</h2>
+    <div class="rec-grid">
+      <button class="rec-btn" id="recBtn" aria-label="Start recording"><span class="dot"></span></button>
+      <div class="rec-info">
+        <p class="timer" id="timer">00:00</p>
+        <div class="meter"><i id="meterFill"></i></div>
+        <p class="status" id="status">Ready.</p>
+        <div class="field">
+          <label class="inline">Input
+            <select id="device"><option value="">Default microphone</option></select>
+          </label>
+          <button class="btn" id="importBtn" type="button">Import audio file</button>
+          <input type="file" id="fileInput" accept="audio/*" hidden>
+          <label class="inline" title="Press Space to start / stop">
+            <span style="color:var(--dim)">Tip: press <code>Space</code> to record</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== OPTIONS ===================== -->
+  <section class="card">
+    <h2>Processing chain</h2>
+    <div class="opt-grid">
+
+      <div class="opt">
+        <div class="row"><span class="name">Background noise removal</span><span class="val" id="nrVal">55%</span></div>
+        <div class="hint">Spectral gating. Higher = more aggressive; leave a moment of room tone at the start for the best estimate.</div>
+        <input type="range" id="nr" min="0" max="100" value="55" step="5">
+      </div>
+
+      <div class="opt">
+        <div class="row"><span class="name">Voice clarity</span>
+          <label class="switch"><input type="checkbox" id="clarity" checked><span class="slider-track"></span></label>
+        </div>
+        <div class="hint">Rumble filter, de-mud, presence boost, air shelf and a gentle voice compressor.</div>
+      </div>
+
+      <div class="opt">
+        <div class="row"><span class="name">De-esser</span>
+          <label class="switch"><input type="checkbox" id="deess" checked><span class="slider-track"></span></label>
+        </div>
+        <div class="hint">Tames harsh "s" and "sh" sounds without dulling the voice.</div>
+      </div>
+
+      <div class="opt">
+        <div class="row"><span class="name">Master bus</span>
+          <label class="switch"><input type="checkbox" id="master" checked><span class="slider-track"></span></label>
+        </div>
+        <div class="hint">Gentle glue compression before the limiter.</div>
+      </div>
+
+      <div class="opt">
+        <div class="row"><span class="name">Target loudness</span></div>
+        <select id="target" style="width:100%;margin-top:6px">
+          <option value="-16" selected>-16 LUFS &nbsp;·&nbsp; podcast / spoken voice</option>
+          <option value="-14">-14 LUFS &nbsp;·&nbsp; streaming (YouTube, Spotify)</option>
+          <option value="-18">-18 LUFS &nbsp;·&nbsp; conservative voice</option>
+          <option value="-23">-23 LUFS &nbsp;·&nbsp; EBU R128 broadcast</option>
+          <option value="none">No level change</option>
+        </select>
+        <div class="hint" id="targetHint">EBU R128 integrated loudness</div>
+      </div>
+
+      <div class="opt">
+        <div class="row"><span class="name">Export formats</span></div>
+        <label class="inline" style="margin-top:8px"><input type="checkbox" id="fmtWav" checked> WAV (lossless)</label>
+        <label class="inline" style="margin-top:6px"><input type="checkbox" id="fmtMp3" checked> MP3 (128 kbps)</label>
+        <div class="hint" id="mp3state" style="margin-top:8px">Checking MP3 encoder…</div>
+      </div>
+
+    </div>
+    <p class="note">Every recording is limited to a −1 dBTP true-peak ceiling, so it won't clip on playback.</p>
+  </section>
+
+  <!-- ===================== RECORDINGS ===================== -->
+  <section class="card">
+    <h2>Recordings</h2>
+    <div id="recordings"></div>
+  </section>
+
+  <footer>
+    <p><strong>Free building blocks used</strong> — all running locally in your browser:</p>
+    <p>
+      <code>spectral-gating denoiser</code>
+      <code>RBJ biquad EQ</code>
+      <code>dynamic de-esser</code>
+      <code>feed-forward compressor</code>
+      <code>look-ahead true-peak limiter</code>
+      <code>ITU-R BS.1770-4 loudness</code>
+      <code>lamejs MP3 encoder</code>
+    </p>
+    <p>Audio never leaves your device — nothing is uploaded. Works offline for recording, cleanup and WAV export.</p>
+  </footer>
+</div>
+
+<!-- DSP source: executed on the main thread AND reused to build the worker -->
+<script id="dsp-src">
+/* =========================================================================
+   dsp.js  —  Free, dependency-free voice processing engine
+   Runs identically in Node (for tests) and in the browser (main thread /
+   Web Worker). All functions operate on Float32Array mono signals in
+   the range roughly [-1, 1].
+   ========================================================================= */
+
+/* ------------------------------ FFT ------------------------------------ */
+// In-place iterative radix-2 Cooley-Tukey FFT. Length must be power of two.
+function fftInPlace(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len;
+    const wr = Math.cos(ang), wi = Math.sin(ang);
+    const half = len >> 1;
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < half; k++) {
+        const ur = re[i + k], ui = im[i + k];
+        const vr = re[i + k + half] * cr - im[i + k + half] * ci;
+        const vi = re[i + k + half] * ci + im[i + k + half] * cr;
+        re[i + k] = ur + vr; im[i + k] = ui + vi;
+        re[i + k + half] = ur - vr; im[i + k + half] = ui - vi;
+        const ncr = cr * wr - ci * wi;
+        ci = cr * wi + ci * wr;
+        cr = ncr;
+      }
+    }
+  }
+}
+
+function ifftInPlace(re, im) {
+  const n = re.length;
+  for (let i = 0; i < n; i++) im[i] = -im[i];
+  fftInPlace(re, im);
+  for (let i = 0; i < n; i++) { re[i] /= n; im[i] = -im[i] / n; }
+}
+
+/* --------------------------- Biquad filters ---------------------------- */
+// RBJ audio-EQ-cookbook coefficients, already normalised by a0.
+function makeBiquad(type, fs, f0, Q, gainDB) {
+  f0 = Math.min(f0, fs * 0.49);
+  const A = Math.pow(10, (gainDB || 0) / 40);
+  const w0 = (2 * Math.PI * f0) / fs;
+  const cosw0 = Math.cos(w0), sinw0 = Math.sin(w0);
+  const alpha = sinw0 / (2 * (Q || 0.707));
+  let b0, b1, b2, a0, a1, a2;
+  switch (type) {
+    case 'lowpass':
+      b0 = (1 - cosw0) / 2; b1 = 1 - cosw0; b2 = (1 - cosw0) / 2;
+      a0 = 1 + alpha; a1 = -2 * cosw0; a2 = 1 - alpha; break;
+    case 'highpass':
+      b0 = (1 + cosw0) / 2; b1 = -(1 + cosw0); b2 = (1 + cosw0) / 2;
+      a0 = 1 + alpha; a1 = -2 * cosw0; a2 = 1 - alpha; break;
+    case 'bandpass':
+      b0 = alpha; b1 = 0; b2 = -alpha;
+      a0 = 1 + alpha; a1 = -2 * cosw0; a2 = 1 - alpha; break;
+    case 'peaking':
+      b0 = 1 + alpha * A; b1 = -2 * cosw0; b2 = 1 - alpha * A;
+      a0 = 1 + alpha / A; a1 = -2 * cosw0; a2 = 1 - alpha / A; break;
+    case 'highshelf': {
+      const S = 1;
+      const al = (sinw0 / 2) * Math.sqrt((A + 1 / A) * (1 / S - 1) + 2);
+      const tsa = 2 * Math.sqrt(A) * al;
+      b0 = A * ((A + 1) + (A - 1) * cosw0 + tsa);
+      b1 = -2 * A * ((A - 1) + (A + 1) * cosw0);
+      b2 = A * ((A + 1) + (A - 1) * cosw0 - tsa);
+      a0 = (A + 1) - (A - 1) * cosw0 + tsa;
+      a1 = 2 * ((A - 1) - (A + 1) * cosw0);
+      a2 = (A + 1) - (A - 1) * cosw0 - tsa;
+      break;
+    }
+    case 'lowshelf': {
+      const S = 1;
+      const al = (sinw0 / 2) * Math.sqrt((A + 1 / A) * (1 / S - 1) + 2);
+      const tsa = 2 * Math.sqrt(A) * al;
+      b0 = A * ((A + 1) - (A - 1) * cosw0 + tsa);
+      b1 = 2 * A * ((A - 1) - (A + 1) * cosw0);
+      b2 = A * ((A + 1) - (A - 1) * cosw0 - tsa);
+      a0 = (A + 1) + (A - 1) * cosw0 + tsa;
+      a1 = -2 * ((A - 1) + (A + 1) * cosw0);
+      a2 = (A + 1) + (A - 1) * cosw0 - tsa;
+      break;
+    }
+    default:
+      throw new Error('unknown biquad type ' + type);
+  }
+  return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
+}
+
+// Direct-form-II-transposed biquad applied to a whole buffer.
+function applyBiquad(x, c) {
+  const y = new Float32Array(x.length);
+  const { b0, b1, b2, a1, a2 } = c;
+  let z1 = 0, z2 = 0;
+  for (let i = 0; i < x.length; i++) {
+    const xi = x[i];
+    const yi = b0 * xi + z1;
+    z1 = b1 * xi - a1 * yi + z2;
+    z2 = b2 * xi - a2 * yi;
+    y[i] = yi;
+  }
+  return y;
+}
+
+/* ------------------------- Noise reduction ----------------------------- */
+// Spectral-gating denoiser. Noise floor is estimated per FFT bin from a
+// low percentile of the magnitude distribution (histogram -> O(1) memory,
+// robust for long recordings). Processing is streaming weighted overlap-add
+// with a sqrt-Hann window (analysis x synthesis = Hann, COLA = 1.0).
+function estimateNoiseFloor(x, N, hop, win, bins, percentile) {
+  const HIST = 220, MIN_DB = -130, MAX_DB = 10;
+  const hist = new Uint32Array(bins * HIST);
+  const re = new Float32Array(N), im = new Float32Array(N);
+  const scale = (HIST - 1) / (MAX_DB - MIN_DB);
+  let frames = 0;
+  for (let s = 0; s + N <= x.length; s += hop) {
+    for (let i = 0; i < N; i++) { re[i] = x[s + i] * win[i]; im[i] = 0; }
+    fftInPlace(re, im);
+    for (let k = 0; k < bins; k++) {
+      const m = Math.hypot(re[k], im[k]);
+      let db = 20 * Math.log10(m + 1e-15);
+      if (db < MIN_DB) db = MIN_DB; else if (db > MAX_DB) db = MAX_DB;
+      const idx = ((db - MIN_DB) * scale) | 0;
+      hist[k * HIST + idx]++;
+    }
+    frames++;
+  }
+  const noise = new Float32Array(bins);
+  if (frames === 0) return noise;
+  const target = frames * percentile;
+  for (let k = 0; k < bins; k++) {
+    let cum = 0, chosen = 0;
+    for (let b = 0; b < HIST; b++) {
+      cum += hist[k * HIST + b];
+      if (cum >= target) { chosen = b; break; }
+    }
+    const db = MIN_DB + chosen / scale;
+    noise[k] = Math.pow(10, db / 20);
+  }
+  return noise;
+}
+
+function noiseReduce(x, fs, opts) {
+  opts = opts || {};
+  const N = 1024, hop = N >> 1, bins = N / 2 + 1;
+  const win = new Float32Array(N);
+  for (let i = 0; i < N; i++) win[i] = Math.sin((Math.PI * i) / N);
+
+  if (x.length < N) return Float32Array.from(x);
+
+  const strength = Math.max(0, Math.min(1, opts.strength != null ? opts.strength : 0.6));
+  const overSub = 1 + strength * 3.0;               // 1 .. 4
+  const floorG = 0.02 + (1 - strength) * 0.10;      // residual floor
+  const passthrough = !!opts._passthrough;
+  const onProg = opts.onProgress || function () {};
+  const totalFrames = Math.floor((x.length - N) / hop) + 1;
+
+  onProg(0.02);
+  const noise = passthrough
+    ? new Float32Array(bins)
+    : estimateNoiseFloor(x, N, hop, win, bins, opts.percentile != null ? opts.percentile : 0.12);
+  onProg(0.5);
+
+  const out = new Float32Array(x.length);
+  const acc = new Float32Array(N);
+  const norm = new Float32Array(N);
+  const re = new Float32Array(N), im = new Float32Array(N);
+  const g = new Float32Array(bins);
+  const gs = new Float32Array(bins);
+  let frames = 0;
+
+  for (let s = 0; s + N <= x.length; s += hop) {
+    for (let i = 0; i < N; i++) { re[i] = x[s + i] * win[i]; im[i] = 0; }
+    fftInPlace(re, im);
+
+    if (passthrough) {
+      gs.fill(1);
+    } else {
+      for (let k = 0; k < bins; k++) {
+        const m = Math.hypot(re[k], im[k]);
+        let gi = 1 - overSub * (noise[k] / (m + 1e-12));
+        if (gi < floorG) gi = floorG; else if (gi > 1) gi = 1;
+        g[k] = gi;
+      }
+      for (let k = 0; k < bins; k++) {
+        const a = g[k > 0 ? k - 1 : 0];
+        const b = g[k];
+        const c = g[k < bins - 1 ? k + 1 : bins - 1];
+        gs[k] = (a + b + c) / 3;
+      }
+    }
+
+    for (let k = 0; k < bins; k++) {
+      re[k] *= gs[k]; im[k] *= gs[k];
+      if (k > 0 && k < N / 2) { const j = N - k; re[j] *= gs[k]; im[j] *= gs[k]; }
+    }
+    ifftInPlace(re, im);
+
+    for (let i = 0; i < N; i++) {
+      acc[i] += re[i] * win[i];
+      norm[i] += win[i] * win[i];
+    }
+    for (let i = 0; i < hop; i++) {
+      const nn = norm[i] > 1e-6 ? norm[i] : 1;
+      out[s + i] = acc[i] / nn;
+    }
+    acc.copyWithin(0, hop); acc.fill(0, N - hop);
+    norm.copyWithin(0, hop); norm.fill(0, N - hop);
+    frames++;
+    if ((frames & 127) === 0) onProg(0.5 + 0.5 * (frames / totalFrames));
+  }
+  onProg(1);
+
+  let flushed = frames * hop;
+  for (let i = 0; i < x.length - flushed && i < N; i++) {
+    const nn = norm[i] > 1e-6 ? norm[i] : 1;
+    out[flushed + i] = acc[i] / nn;
+  }
+  return out;
+}
+
+/* --------------------------- Dynamics ---------------------------------- */
+// Feed-forward peak compressor with soft knee + makeup gain.
+function compress(x, fs, p) {
+  const thrDB = p.thresholdDB, ratio = p.ratio;
+  const atk = Math.exp(-1 / ((fs * (p.attackMs || 10)) / 1000));
+  const rel = Math.exp(-1 / ((fs * (p.releaseMs || 120)) / 1000));
+  const makeup = Math.pow(10, (p.makeupDB || 0) / 20);
+  const knee = p.kneeDB || 0;
+  const out = new Float32Array(x.length);
+  let env = 0;
+  for (let i = 0; i < x.length; i++) {
+    const a = Math.abs(x[i]);
+    env = a > env ? atk * env + (1 - atk) * a : rel * env + (1 - rel) * a;
+    const envdb = 20 * Math.log10(env + 1e-12);
+    const over = envdb - thrDB;
+    let gdb = 0;
+    if (over > 0) {
+      if (knee > 0 && over < knee) gdb = -((1 - 1 / ratio) * over * over) / (2 * knee);
+      else gdb = -over * (1 - 1 / ratio);
+    }
+    out[i] = x[i] * Math.pow(10, gdb / 20) * makeup;
+  }
+  return out;
+}
+
+// De-esser: split at a crossover, attenuate the high band only when the
+// sibilance band exceeds threshold.
+function deEss(x, fs, p) {
+  p = p || {};
+  const xo = p.crossover || 4200;
+  const low = applyBiquad(x, makeBiquad('lowpass', fs, xo, 0.707));
+  const high = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) high[i] = x[i] - low[i];
+  let sib = applyBiquad(high, makeBiquad('highpass', fs, p.lowFreq || 5000, 0.707));
+  sib = applyBiquad(sib, makeBiquad('lowpass', fs, p.highFreq || 9000, 0.707));
+  const thr = Math.pow(10, (p.thresholdDB != null ? p.thresholdDB : -30) / 20);
+  const ratio = p.ratio || 3;
+  const atk = Math.exp(-1 / ((fs * (p.attackMs || 1)) / 1000));
+  const rel = Math.exp(-1 / ((fs * (p.releaseMs || 60)) / 1000));
+  const out = new Float32Array(x.length);
+  let env = 0;
+  for (let i = 0; i < x.length; i++) {
+    const a = Math.abs(sib[i]);
+    env = a > env ? atk * env + (1 - atk) * a : rel * env + (1 - rel) * a;
+    let gain = 1;
+    if (env > thr) gain = Math.pow(env / thr, 1 / ratio - 1);
+    out[i] = low[i] + high[i] * gain;
+  }
+  return out;
+}
+
+// Look-ahead brickwall limiter with sliding-window minimum gain and
+// smooth release. Output peak never exceeds the ceiling.
+function limit(x, fs, p) {
+  p = p || {};
+  const ceilLin = Math.pow(10, (p.ceilingDBTP != null ? p.ceilingDBTP : -1) / 20);
+  const la = Math.max(1, Math.round((fs * (p.lookaheadMs || 5)) / 1000));
+  const rel = Math.exp(-1 / ((fs * (p.releaseMs || 80)) / 1000));
+  const n = x.length;
+  const g = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = Math.abs(x[i]);
+    g[i] = a > ceilLin ? ceilLin / a : 1;
+  }
+  // forward-looking sliding minimum fm[i] = min(g[i .. i+la])
+  const fm = new Float32Array(n);
+  const dq = new Int32Array(n);
+  let head = n, tail = n - 1;
+  for (let i = n - 1; i >= 0; i--) {
+    while (head <= tail && g[dq[head]] >= g[i]) head++;
+    dq[--head] = i;
+    while (head <= tail && dq[tail] > i + la) tail--;
+    fm[i] = g[dq[head]];
+  }
+  const out = new Float32Array(n);
+  let prev = 1;
+  for (let i = 0; i < n; i++) {
+    prev = Math.min(prev + (1 - prev) * (1 - rel), fm[i]);
+    out[i] = x[i] * prev;
+  }
+  return out;
+}
+
+/* ----------------------- Loudness (ITU-R BS.1770) ---------------------- */
+function kWeightIIR(G, Q, fc, rate) {
+  const K = Math.tan((Math.PI * fc) / rate);
+  const Vh = Math.pow(10, G / 20);
+  const Vb = Math.pow(Vh, 0.4996667741545416);
+  const a0 = 1 + K / Q + K * K;
+  return {
+    b0: (Vh + (Vb * K) / Q + K * K) / a0,
+    b1: (2 * (K * K - Vh)) / a0,
+    b2: (Vh - (Vb * K) / Q + K * K) / a0,
+    a1: (2 * (K * K - 1)) / a0,
+    a2: (1 - K / Q + K * K) / a0,
+  };
+}
+
+function integratedLoudness(x, fs) {
+  if (!x.length) return -Infinity;
+  let y = applyBiquad(x, kWeightIIR(4.0, 1 / Math.sqrt(2), 1500, fs));
+  y = applyBiquad(y, kWeightIIR(0.0, 0.5, 38, fs));
+  const blockSize = Math.round(0.4 * fs);
+  const step = Math.round(0.1 * fs);
+  const blocks = [];
+  if (y.length >= blockSize) {
+    for (let s = 0; s + blockSize <= y.length; s += step) {
+      let sum = 0;
+      for (let i = 0; i < blockSize; i++) { const v = y[s + i]; sum += v * v; }
+      const ms = sum / blockSize;
+      blocks.push({ l: -0.691 + 10 * Math.log10(ms + 1e-12), ms });
+    }
+  } else {
+    let sum = 0;
+    for (let i = 0; i < y.length; i++) sum += y[i] * y[i];
+    const ms = sum / y.length;
+    blocks.push({ l: -0.691 + 10 * Math.log10(ms + 1e-12), ms });
+  }
+  let gated = blocks.filter((b) => b.l >= -70);
+  if (!gated.length) return -Infinity;
+  const mean1 = gated.reduce((a, b) => a + b.ms, 0) / gated.length;
+  const relThresh = -0.691 + 10 * Math.log10(mean1 + 1e-12) - 10;
+  gated = gated.filter((b) => b.l >= relThresh);
+  if (!gated.length) return -Infinity;
+  const mean2 = gated.reduce((a, b) => a + b.ms, 0) / gated.length;
+  return -0.691 + 10 * Math.log10(mean2 + 1e-12);
+}
+
+function peakDB(x) {
+  let p = 0;
+  for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > p) p = a; }
+  return 20 * Math.log10(p + 1e-12);
+}
+
+// 4x oversampled true-peak estimate (linear phase FIR interpolation).
+function truePeakDB(x) {
+  if (!x.length) return -Infinity;
+  const L = 4;
+  const T = 6;                        // taps per phase (cheap enough for long files)
+  const sinc = (t) => (t === 0 ? 1 : Math.sin(Math.PI * t) / (Math.PI * t));
+  const hann = (n, N) => 0.5 - 0.5 * Math.cos((2 * Math.PI * n) / N);
+  // build polyphase filters
+  const phases = [];
+  for (let ph = 0; ph < L; ph++) {
+    const h = new Float32Array(2 * T + 1);
+    for (let k = -T; k <= T; k++) {
+      const t = k - ph / L;
+      h[k + T] = sinc(t) * hann(k + T, 2 * T + 1);
+    }
+    phases.push(h);
+  }
+  let peak = 0;
+  for (let i = 0; i < x.length; i++) {
+    for (let ph = 0; ph < L; ph++) {
+      const h = phases[ph];
+      let acc = 0;
+      for (let k = -T; k <= T; k++) {
+        const idx = i + k;
+        if (idx >= 0 && idx < x.length) acc += x[idx] * h[k + T];
+      }
+      const a = Math.abs(acc);
+      if (a > peak) peak = a;
+    }
+  }
+  return 20 * Math.log10(peak + 1e-12);
+}
+
+/* --------------------------- Orchestration ----------------------------- */
+function processVoice(input, fs, opt) {
+  opt = opt || {};
+  const stats = { applied: [], fs, samples: input.length };
+  const prog = opt.onProgress || function () {};
+  let y = Float32Array.from(input);
+
+  prog('analysing', 0.02);
+  stats.inputLoudness = integratedLoudness(y, fs);
+  stats.inputPeakDB = peakDB(y);
+
+  if (opt.noiseReduction > 0) {
+    y = noiseReduce(y, fs, {
+      strength: opt.noiseReduction,
+      percentile: opt.noisePercentile,
+      onProgress: (f) => prog('noise-reduction', f),
+    });
+    stats.applied.push('noise-reduction');
+  }
+
+  prog('clarity', 0);
+  if (opt.clarity) {
+    y = applyBiquad(y, makeBiquad('highpass', fs, 78, 0.707));         // rumble / rumble-free
+    y = applyBiquad(y, makeBiquad('peaking', fs, 320, 1.0, -2.5));     // de-mud
+    y = applyBiquad(y, makeBiquad('peaking', fs, 3200, 1.1, 3.2));     // presence / intelligibility
+    y = applyBiquad(y, makeBiquad('highshelf', fs, 8000, 0.707, 2.0)); // air
+    stats.applied.push('clarity-eq');
+  }
+  if (opt.deEss) {
+    y = deEss(y, fs, { crossover: 4200, lowFreq: 5000, highFreq: 9000, thresholdDB: -30, ratio: 3.5 });
+    stats.applied.push('de-esser');
+  }
+  if (opt.clarity) {
+    y = compress(y, fs, { thresholdDB: -18, ratio: 2.5, attackMs: 8, releaseMs: 140, kneeDB: 6 });
+    stats.applied.push('voice-compressor');
+  }
+  if (opt.master) {
+    y = compress(y, fs, { thresholdDB: -14, ratio: 1.8, attackMs: 20, releaseMs: 260, kneeDB: 8 });
+    stats.applied.push('master-compressor');
+  }
+
+  prog('loudness', 0);
+  const preNorm = integratedLoudness(y, fs);
+  if (opt.targetLUFS != null && isFinite(preNorm)) {
+    const gainDB = opt.targetLUFS - preNorm;
+    const gain = Math.pow(10, gainDB / 20);
+    for (let i = 0; i < y.length; i++) y[i] *= gain;
+    stats.normGainDB = gainDB;
+    stats.applied.push('loudness-normalize');
+  }
+
+  prog('limiting', 0);
+  y = limit(y, fs, { ceilingDBTP: opt.ceilingDB != null ? opt.ceilingDB : -1.0, lookaheadMs: 5, releaseMs: 90 });
+  stats.applied.push('true-peak-limiter');
+
+  prog('measuring', 0);
+  stats.outputLoudness = integratedLoudness(y, fs);
+  stats.outputPeakDB = peakDB(y);
+  stats.outputTruePeakDB = truePeakDB(y);
+  return { samples: y, stats };
+}
+
+/* --------------------------- Utilities --------------------------------- */
+function mixToMono(channels) {
+  if (channels.length === 1) return channels[0];
+  const n = channels[0].length;
+  const out = new Float32Array(n);
+  for (let c = 0; c < channels.length; c++) {
+    const ch = channels[c];
+    for (let i = 0; i < n; i++) out[i] += ch[i];
+  }
+  const inv = 1 / channels.length;
+  for (let i = 0; i < n; i++) out[i] *= inv;
+  return out;
+}
+
+function resampleLinear(x, fromRate, toRate) {
+  if (fromRate === toRate) return x;
+  const ratio = toRate / fromRate;
+  const n = Math.max(1, Math.round(x.length * ratio));
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const pos = i / ratio;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(i0 + 1, x.length - 1);
+    const t = pos - i0;
+    out[i] = x[i0] * (1 - t) + x[i1] * t;
+  }
+  return out;
+}
+
+function encodeWAV(samples, fs) {
+  const dataSize = samples.length * 2;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); ws(8, 'WAVE');
+  ws(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, fs, true);
+  view.setUint32(28, fs * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  ws(36, 'data'); view.setUint32(40, dataSize, true);
+  let o = 44;
+  for (let i = 0; i < samples.length; i++) {
+    let s = samples[i];
+    s = s < -1 ? -1 : s > 1 ? 1 : s;
+    view.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    o += 2;
+  }
+  return buffer;
+}
+
+/* --------------------------- Exports ----------------------------------- */
+const DSP = {
+  fftInPlace, ifftInPlace, makeBiquad, applyBiquad, noiseReduce, estimateNoiseFloor,
+  compress, deEss, limit, integratedLoudness, peakDB, truePeakDB, processVoice,
+  mixToMono, resampleLinear, encodeWAV,
+};
+if (typeof module !== 'undefined' && module.exports) module.exports = DSP;
+if (typeof self !== 'undefined') self.DSP = DSP;
+
+</script>
+<!-- Worker source: kept as text, combined with the DSP above into a Web Worker -->
+<script id="worker-src" type="text/plain">
+/* worker.js — runs the DSP pipeline off the main thread.
+   DSP (dsp.js) is concatenated ahead of this file in the worker blob. */
+self.onmessage = function (e) {
+  const d = e.data || {};
+  if (d.type !== 'process') return;
+  const id = d.id;
+  try {
+    const samples = new Float32Array(d.samples);
+    const t0 = Date.now();
+    const res = self.DSP.processVoice(samples, d.fs, Object.assign({}, d.options, {
+      onProgress: function (stage, frac) {
+        self.postMessage({ type: 'progress', id: id, stage: stage, frac: frac });
+      },
+    }));
+    const wav = self.DSP.encodeWAV(res.samples, d.fs);
+    res.stats.elapsedMs = Date.now() - t0;
+    self.postMessage(
+      { type: 'done', id: id, stats: res.stats, samples: res.samples.buffer, wav: wav },
+      [res.samples.buffer, wav]
+    );
+  } catch (err) {
+    self.postMessage({ type: 'error', id: id, message: String((err && err.stack) || err) });
+  }
+};
+
+</script>
+<script>
+/* app.js — recorder + UI. Depends on window.DSP (dsp.js) and optionally lamejs. */
+'use strict';
+
+const TARGET_FS = 22050;          // processing sample rate (plenty for speech, keeps long files light)
+const MIN_LUFS = -30, MAX_LUFS = -8;
+
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+const state = {
+  stream: null, recorder: null, chunks: [], recording: false,
+  startTs: 0, timerId: null, recId: 0, recordings: [],
+  audioCtx: null, analyser: null, srcNode: null, rafId: null,
+  worker: null, jobs: new Map(), jobSeq: 0, mp3Ready: false,
+};
+
+/* ------------------------------ utils ---------------------------------- */
+function fmtTime(s) {
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  const p = (n) => String(n).padStart(2, '0');
+  return h > 0 ? h + ':' + p(m) + ':' + p(ss) : p(m) + ':' + p(ss);
+}
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
+}
+function lufs(v) { return isFinite(v) ? v.toFixed(1) + ' LUFS' : '—'; }
+function db(v) { return isFinite(v) ? v.toFixed(1) + ' dB' : '—'; }
+function setStatus(t) { $('#status').textContent = t || ''; }
+
+/* ---------------------------- worker setup ----------------------------- */
+function initWorker() {
+  const dspSrc = document.getElementById('dsp-src').textContent;
+  const workerSrc = document.getElementById('worker-src').textContent;
+  const blob = new Blob([dspSrc, '\n', workerSrc], { type: 'application/javascript' });
+  const w = new Worker(URL.createObjectURL(blob));
+  w.onmessage = (e) => {
+    const d = e.data || {};
+    const job = state.jobs.get(d.id);
+    if (!job) return;
+    if (d.type === 'progress') job.onProgress(d.stage, d.frac);
+    else if (d.type === 'done') { state.jobs.delete(d.id); job.resolve(d); }
+    else if (d.type === 'error') { state.jobs.delete(d.id); job.reject(new Error(d.message)); }
+  };
+  w.onerror = (err) => { console.error('worker error', err); setStatus('Processing worker crashed.'); };
+  state.worker = w;
+}
+
+function runProcess(samples, fs, options, onProgress) {
+  return new Promise((resolve, reject) => {
+    const id = ++state.jobSeq;
+    state.jobs.set(id, { resolve, reject, onProgress });
+    const buf = samples.buffer;
+    state.worker.postMessage({ type: 'process', id, samples: buf, fs, options }, [buf]);
+  });
+}
+
+/* ---------------------------- recording -------------------------------- */
+async function listDevices() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devs.filter((d) => d.kind === 'audioinput');
+    const sel = $('#device');
+    const cur = sel.value;
+    sel.innerHTML = '';
+    if (!inputs.length) { sel.innerHTML = '<option value="">Default microphone</option>'; return; }
+    inputs.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = d.label || ('Microphone ' + (i + 1));
+      sel.appendChild(o);
+    });
+    if (cur && inputs.some((d) => d.deviceId === cur)) sel.value = cur;
+  } catch (e) { /* enumerate can fail before permission; handled on first record */ }
+}
+
+function pickMime() {
+  const cands = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/aac'];
+  for (const c of cands) if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
+  return '';
+}
+
+async function startRecording() {
+  try {
+    const deviceId = $('#device').value;
+    const constraints = { audio: deviceId ? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : { echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
+    setStatus('Requesting microphone…');
+    state.stream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (e) {
+    setStatus(micError(e));
+    const b = $('#secureBanner');
+    if (b) b.hidden = false;
+    return;
+  }
+  await listDevices();
+
+  // level meter
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    state.audioCtx = new AC();
+    state.srcNode = state.audioCtx.createMediaStreamSource(state.stream);
+    state.analyser = state.audioCtx.createAnalyser();
+    state.analyser.fftSize = 1024;
+    state.srcNode.connect(state.analyser);
+    drawMeter();
+  } catch (e) { /* meter optional */ }
+
+  const mime = pickMime();
+  state.chunks = [];
+  try {
+    state.recorder = mime ? new MediaRecorder(state.stream, { mimeType: mime, audioBitsPerSecond: 128000 })
+      : new MediaRecorder(state.stream);
+  } catch (e) {
+    setStatus('Recording not supported in this browser.');
+    return;
+  }
+  state.recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) state.chunks.push(ev.data); };
+  state.recorder.onstop = finalizeRecording;
+  state.recorder.start(1000);
+
+  state.recording = true;
+  state.startTs = performance.now();
+  $('#recBtn').classList.add('recording');
+  $('#recBtn').setAttribute('aria-label', 'Stop recording');
+  setStatus('Recording…');
+  state.timerId = setInterval(() => {
+    $('#timer').textContent = fmtTime((performance.now() - state.startTs) / 1000);
+  }, 200);
+}
+
+function stopRecording() {
+  if (!state.recording) return;
+  state.recording = false;
+  clearInterval(state.timerId);
+  $('#recBtn').classList.remove('recording');
+  $('#recBtn').setAttribute('aria-label', 'Start recording');
+  try { state.recorder.stop(); } catch (e) {}
+  if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
+  cancelAnimationFrame(state.rafId);
+  if (state.audioCtx) { state.audioCtx.close(); state.audioCtx = null; }
+  $('#meterFill').style.width = '0%';
+  setStatus('Finishing…');
+}
+
+function finalizeRecording() {
+  const mime = state.recorder.mimeType || 'audio/webm';
+  const blob = new Blob(state.chunks, { type: mime });
+  const dur = (performance.now() - state.startTs) / 1000;
+  if (blob.size < 1200) { setStatus('Recording too short.'); return; }
+  const rec = {
+    id: ++state.recId,
+    name: 'Recording ' + state.recId,
+    blob, url: URL.createObjectURL(blob),
+    duration: dur, size: blob.size, mime,
+    result: null,
+  };
+  state.recordings.unshift(rec);
+  renderList();
+  setStatus('Saved — ' + fmtTime(dur) + ', ' + fmtBytes(blob.size));
+}
+
+function drawMeter() {
+  const a = state.analyser;
+  if (!a) return;
+  const data = new Float32Array(a.fftSize);
+  const loop = () => {
+    if (!state.analyser) return;
+    a.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    const rms = Math.sqrt(sum / data.length);
+    const pct = Math.max(0, Math.min(100, Math.pow(rms, 0.5) * 140));
+    $('#meterFill').style.width = pct + '%';
+    state.rafId = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+/* --------------------------- mic help + import ------------------------- */
+function isRestrictedContext() {
+  return !window.isSecureContext || location.protocol === 'file:';
+}
+
+function checkContext() {
+  const b = $('#secureBanner');
+  if (!b) return;
+  if (!navigator.mediaDevices || isRestrictedContext()) {
+    const fileProto = location.protocol === 'file:';
+    b.hidden = false;
+    b.innerHTML =
+      '<strong>Microphone access needs a secure page.</strong> ' +
+      (fileProto ? 'You opened this file directly, which most browsers restrict for the microphone. ' : '') +
+      'The reliable fix is to serve it over a local address: open a terminal in the folder and run ' +
+      '<code>python3 -m http.server</code>, then visit <code>http://localhost:8000/voice-recorder.html</code> ' +
+      'and allow the microphone. ' +
+      'You can also <strong>import an existing audio file</strong> below and use the full clean-up chain without a mic.';
+  } else {
+    b.hidden = true;
+  }
+}
+
+function micError(e) {
+  const name = e && e.name;
+  if (!navigator.mediaDevices) {
+    return 'This browser will not expose the microphone on this page. Serve it over http://localhost and reload.';
+  }
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+    return 'Microphone permission was denied. Click the lock / site icon in the address bar, set Microphone to “Allow”, then reload. If you opened this as a local file, serve it via http://localhost instead.';
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return 'No microphone was found. Connect one and reload.';
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return 'The microphone is busy — another app or tab is using it. Close it and try again.';
+  }
+  if (name === 'SecurityError') {
+    return 'The browser blocked the microphone for this page. Serve it over http://localhost and reload.';
+  }
+  return 'Microphone unavailable: ' + (e && e.message ? e.message : e);
+}
+
+function importFile(file) {
+  if (!file) return;
+  if (!/^audio\//.test(file.type) && !/\.(wav|mp3|m4a|aac|ogg|opus|flac|webm)$/i.test(file.name)) {
+    alert('Please choose an audio file.');
+    return;
+  }
+  const rec = {
+    id: ++state.recId,
+    name: file.name.replace(/\.[^.]+$/, '') || ('Imported ' + state.recId),
+    blob: file, url: URL.createObjectURL(file),
+    duration: 0, size: file.size, mime: file.type || 'audio', result: null,
+  };
+  state.recordings.unshift(rec);
+  renderList();
+  setStatus('Imported “' + rec.name + '” — press Clean & master to process it.');
+  const a = document.createElement('audio');
+  a.preload = 'metadata';
+  a.onloadedmetadata = () => { if (isFinite(a.duration)) { rec.duration = a.duration; renderList(); } };
+  a.src = rec.url;
+}
+
+/* ------------------------------ list UI -------------------------------- */
+function renderList() {
+  const wrap = $('#recordings');
+  if (!state.recordings.length) {
+    wrap.innerHTML = '<div class="empty">No recordings yet. Hit record, then process it to clean it up.</div>';
+    return;
+  }
+  wrap.innerHTML = state.recordings.map(cardHTML).join('');
+  state.recordings.forEach(bindCard);
+}
+
+function cardHTML(r) {
+  const res = r.result;
+  let resultHTML = '';
+  if (res) {
+    const st = res.stats;
+    const modules = st.applied.map((m) => '<span class="pill done">' + m.replace(/-/g, ' ') + '</span>').join('');
+    const dl = [];
+    if (res.wavUrl) dl.push('<a class="btn primary" download="' + safeName(r.name) + '-clean.wav" href="' + res.wavUrl + '">Download WAV</a>');
+    if (res.mp3Url) dl.push('<a class="btn" download="' + safeName(r.name) + '-clean.mp3" href="' + res.mp3Url + '">Download MP3</a>');
+    resultHTML =
+      '<div class="stats">' +
+        '<div class="stat"><div class="k">Input</div><div class="v">' + lufs(st.inputLoudness) + '</div></div>' +
+        '<div class="stat"><div class="k">Output loudness</div><div class="v good">' + lufs(st.outputLoudness) + '</div></div>' +
+        '<div class="stat"><div class="k">True peak</div><div class="v">' + (isFinite(st.outputTruePeakDB) ? st.outputTruePeakDB.toFixed(1) + ' dBTP' : '—') + '</div></div>' +
+        '<div class="stat"><div class="k">Gain applied</div><div class="v">' + db(st.normGainDB) + '</div></div>' +
+      '</div>' +
+      '<div style="margin-top:10px">' + modules + '</div>' +
+      '<div class="note">Processed in ' + (st.elapsedMs / 1000).toFixed(1) + ' s &middot; ' + TARGET_FS / 1000 + ' kHz mono</div>' +
+      (dl.length ? '<div class="actions">' + dl.join('') + '</div>' : '');
+  }
+  return '' +
+    '<div class="rec-item" data-id="' + r.id + '">' +
+      '<div class="rec-head">' +
+        '<span class="title">' + r.name + '</span>' +
+        '<span class="meta">' + fmtTime(r.duration) + ' &middot; ' + fmtBytes(r.size) + '</span>' +
+        '<span class="spacer"></span>' +
+        '<button class="btn ghost" data-act="rename">Rename</button>' +
+        '<button class="btn danger" data-act="delete">Delete</button>' +
+      '</div>' +
+      '<audio controls src="' + r.url + '"></audio>' +
+      '<div class="actions">' +
+        '<button class="btn primary" data-act="process">Clean &amp; master</button>' +
+        '<a class="btn" download="' + safeName(r.name) + '-raw" href="' + r.url + '">Download original</a>' +
+      '</div>' +
+      '<div class="progress" data-el="prog"><i></i></div>' +
+      '<div class="prog-label" data-el="proglabel"></div>' +
+      '<div data-el="result">' + resultHTML + '</div>' +
+    '</div>';
+}
+
+function safeName(n) { return n.replace(/[^\w.-]+/g, '_'); }
+
+function bindCard(r) {
+  const el = $('.rec-item[data-id="' + r.id + '"]');
+  if (!el) return;
+  $('[data-act="delete"]', el).onclick = () => {
+    state.recordings = state.recordings.filter((x) => x !== r);
+    URL.revokeObjectURL(r.url);
+    if (r.result) { if (r.result.wavUrl) URL.revokeObjectURL(r.result.wavUrl); if (r.result.mp3Url) URL.revokeObjectURL(r.result.mp3Url); }
+    renderList();
+  };
+  $('[data-act="rename"]', el).onclick = () => {
+    const nn = prompt('Recording name', r.name);
+    if (nn != null && nn.trim()) { r.name = nn.trim(); renderList(); }
+  };
+  $('[data-act="process"]', el).onclick = () => processRecording(r, el);
+}
+
+/* ---------------------------- processing ------------------------------- */
+function readOptions() {
+  const nr = parseInt($('#nr').value, 10) / 100;
+  const tl = $('#target').value;
+  const targetLUFS = tl === 'none' ? null : parseFloat(tl);
+  return {
+    noiseReduction: nr,
+    noisePercentile: 0.12,
+    clarity: $('#clarity').checked,
+    deEss: $('#deess').checked,
+    master: $('#master').checked,
+    targetLUFS,
+    ceilingDB: -1.0,
+    formats: { wav: $('#fmtWav').checked, mp3: $('#fmtMp3').checked && state.mp3Ready },
+  };
+}
+
+async function decodeToMono(blob) {
+  const arr = await blob.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  const buf = await ctx.decodeAudioData(arr);
+  ctx.close();
+  const chans = [];
+  for (let c = 0; c < buf.numberOfChannels; c++) chans.push(buf.getChannelData(c));
+  let mono = DSP.mixToMono(chans);
+  if (buf.sampleRate !== TARGET_FS) mono = DSP.resampleLinear(mono, buf.sampleRate, TARGET_FS);
+  return mono;
+}
+
+async function processRecording(r, el) {
+  const opts = readOptions();
+  const prog = $('[data-el="prog"]', el);
+  const fill = $('i', prog);
+  const label = $('[data-el="proglabel"]', el);
+  const resultBox = $('[data-el="result"]', el);
+  const btn = $('[data-act="process"]', el);
+
+  if (r.duration > 60 * 50) {
+    if (!confirm('This recording is ' + fmtTime(r.duration) + ' long. Processing may take a few minutes and use a lot of memory. Continue?')) return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Processing…';
+  prog.style.display = 'block'; label.style.display = 'block';
+  resultBox.innerHTML = '<div class="err" style="color:var(--muted)">Decoding audio…</div>';
+  fill.style.width = '3%';
+  label.textContent = 'Decoding…';
+
+  let mono;
+  try {
+    mono = await decodeToMono(r.blob);
+  } catch (e) {
+    resultBox.innerHTML = '<div class="err">Could not decode this recording: ' + (e && e.message ? e.message : e) + '</div>';
+    btn.disabled = false; btn.textContent = 'Clean & master'; prog.style.display = 'none'; label.style.display = 'none';
+    return;
+  }
+  fill.style.width = '8%';
+
+  const stageNames = {
+    'analysing': 'Measuring input loudness', 'noise-reduction': 'Removing background noise',
+    'clarity': 'Shaping voice clarity', 'loudness': 'Normalising loudness', 'limiting': 'True-peak limiting', 'measuring': 'Measuring output',
+  };
+  let done;
+  try {
+    done = await runProcess(mono, TARGET_FS, opts, (stage, frac) => {
+      const nm = stageNames[stage] || stage;
+      label.textContent = nm + '…';
+      let f = 8 + (frac || 0) * 82;
+      if (stage !== 'noise-reduction') f = 8 + 82; // non-noise stages are quick
+      fill.style.width = Math.min(94, f) + '%';
+    });
+  } catch (e) {
+    resultBox.innerHTML = '<div class="err">Processing failed: ' + (e && e.message ? e.message : e) + '</div>';
+    btn.disabled = false; btn.textContent = 'Clean & master'; return;
+  }
+
+  const samples = new Float32Array(done.samples);
+  const result = { stats: done.stats, wavBlob: null, mp3Blob: null, wavUrl: null, mp3Url: null };
+
+  if (opts.formats.wav) {
+    result.wavBlob = new Blob([done.wav], { type: 'audio/wav' });
+    result.wavUrl = URL.createObjectURL(result.wavBlob);
+  }
+  if (opts.formats.mp3 && state.mp3Ready) {
+    try {
+      label.textContent = 'Encoding MP3…';
+      fill.style.width = '95%';
+      result.mp3Blob = encodeMP3(samples, TARGET_FS);
+      result.mp3Url = URL.createObjectURL(result.mp3Blob);
+    } catch (e) { console.warn('MP3 encode failed', e); }
+  }
+
+  fill.style.width = '100%';
+  label.textContent = 'Done';
+  r.result = result;
+  btn.disabled = false; btn.textContent = 'Re-process';
+  setTimeout(() => { prog.style.display = 'none'; label.style.display = 'none'; }, 900);
+  renderList();
+}
+
+function encodeMP3(float32, fs) {
+  const enc = new lamejs.Mp3Encoder(1, fs, 128);
+  const block = 1152;
+  const out = [];
+  const i16 = new Int16Array(block);
+  for (let i = 0; i < float32.length; i += block) {
+    const n = Math.min(block, float32.length - i);
+    for (let j = 0; j < n; j++) {
+      let s = float32[i + j];
+      s = s < -1 ? -1 : s > 1 ? 1 : s;
+      i16[j] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    const chunk = enc.encodeBuffer(i16.subarray(0, n));
+    if (chunk.length) out.push(new Int8Array(chunk));
+  }
+  const end = enc.flush();
+  if (end.length) out.push(new Int8Array(end));
+  return new Blob(out, { type: 'audio/mpeg' });
+}
+
+/* ------------------------------ boot ----------------------------------- */
+function loadLame(cb) {
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js',
+    'https://unpkg.com/lamejs@1.2.1/lame.min.js',
+  ];
+  let i = 0;
+  const tryNext = () => {
+    if (i >= urls.length) { cb(false); return; }
+    const s = document.createElement('script');
+    s.src = urls[i++];
+    s.onload = () => cb(typeof lamejs !== 'undefined');
+    s.onerror = tryNext;
+    document.head.appendChild(s);
+  };
+  tryNext();
+}
+
+function wireUI() {
+  $('#recBtn').onclick = () => (state.recording ? stopRecording() : startRecording());
+  $('#importBtn').onclick = () => $('#fileInput').click();
+  $('#fileInput').addEventListener('change', (e) => {
+    importFile(e.target.files && e.target.files[0]);
+    e.target.value = '';
+  });
+  $('#nr').addEventListener('input', () => {
+    const v = parseInt($('#nr').value, 10);
+    $('#nrVal').textContent = v === 0 ? 'Off' : v + '%';
+  });
+  $('#target').addEventListener('change', () => {
+    $('#targetHint').textContent = $('#target').value === 'none' ? 'No level change (EQ + cleanup only)' : 'EBU R128 integrated loudness';
+  });
+  $('#fmtMp3').addEventListener('change', () => {
+    if ($('#fmtMp3').checked && !state.mp3Ready) {
+      $('#fmtMp3').checked = false;
+      alert('MP3 encoder not available offline. WAV export still works. (Connect to the internet and reload to enable MP3.)');
+    }
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); $('#recBtn').click(); }
+  });
+}
+
+function init() {
+  initWorker();
+  wireUI();
+  checkContext();
+  listDevices();
+  navigator.mediaDevices && navigator.mediaDevices.addEventListener &&
+    navigator.mediaDevices.addEventListener('devicechange', listDevices);
+  loadLame((ok) => {
+    state.mp3Ready = ok;
+    const el = $('#mp3state');
+    if (ok) { el.textContent = 'MP3 encoder ready'; el.style.color = 'var(--accent2)'; }
+    else { $('#fmtMp3').checked = false; el.textContent = 'MP3 unavailable offline — WAV only'; el.style.color = 'var(--dim)'; }
+  });
+  setStatus('Ready.');
+  renderList();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
